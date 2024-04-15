@@ -1,0 +1,80 @@
+!@encoding CP1252
+model Kakuro
+uses "mmxprs"; !gain access to the Xpress-Optimizer solver
+
+
+declarations
+	n: integer ! tamaño de la matriz (nxn). n = 8
+	K: integer ! cantidad de sumas a cumplir. k = 30
+end-declarations
+
+! inicializamos el archivo
+initializations from "Kakuro.txt"
+	n K
+end-initializations
+
+N:= 1..n ! 1..8
+D:= 1..9 ! solo se pueden usar digitos del 1 al 9.
+
+declarations
+	r: array(1..K) of integer ! indica las sumas que se deben cumplir por las celdas en Rk.
+	Rk: array(1..K) of dynamic array(N,N) of integer ! guarda las posiciones i,j que deben sumplir la suma en r
+	!ademas de tener un valor de 1 si es una celda vacia.
+	C: dynamic array(N,N) of integer ! guarda el indice de las casillas vacias.
+	x: array(N,N,D) of mpvar ! variable de decision.
+	matriz_sol: array(N,N) of integer ! matriz solucion
+	f = 1 ! funcion objetivo (cualquier entero)
+end-declarations
+initializations from "Kakuro.txt"
+	r Rk
+end-initializations
+
+! guarda la posicion de las celdas vacias en el conjunto C.
+forall(l in 1..K) do
+	forall(i in N) do
+		forall(j in N) do
+		if(Rk(l)(i,j)=1) then
+			C(i,j):= 1
+		end-if
+	    end-do
+	end-do
+end-do
+! ya tenemos todos los conjuntos necesarios.
+writeln("Cantidad de sumas: ", K)
+writeln("Conjunto de sumas a cumplir: ", r)
+writeln("Celdas que deben cumplir las sumas: ")
+forall(l in 1..K) do
+	writeln(Rk(l))
+end-do
+
+! restriccion de que a cada celda vacia se le puede asignar un solo digito
+forall(i,j in N | exists(C(i,j))) sum(d in D) x(i,j,d) = 1
+
+! restriccion de que los digitos en la misma suma no se pueden reptir
+forall(k in 1..K, d in D) sum(i,j in N | exists(Rk(k)(i,j))) x(i,j,d) <= 1
+
+! restriccion para cumplir la suma asignada en r(k)
+forall(k in 1..K) sum(i,j in N, d in D | exists(Rk(k)(i,j))) d * x(i,j,d) = r(k)
+
+! restriccion para que la variable de decision sea binaria
+forall(i,j in N, d in D | exists(C(i,j))) x(i,j,d) is_binary
+
+! maximizar la funcion objetivo
+maximize(f)
+
+! imprimir la solucion
+writeln(" ")
+writeln("Solucion: ")
+forall(i,j in N) matriz_sol(i,j):= 0
+forall(i,j in N, d in D)
+	if getsol(x(i,j,d)) = 1 then
+		matriz_sol(i,j):= d
+	end-if
+forall(i in N) do
+	writeln(" ")
+	forall(j in N) do
+		write(matriz_sol(i,j), " ")
+	end-do
+end-do
+
+end-model
